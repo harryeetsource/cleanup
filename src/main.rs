@@ -4,29 +4,45 @@ use log::{ debug, error, info, trace, warn };
 use crossterm::execute;
 use crossterm::style::{ Color, ResetColor, SetForegroundColor };
 use std::fs::OpenOptions;
-
+use std::io::{ self, Read };
 struct SystemCommand<'a> {
     program: &'a str,
     args: Vec<&'a str>,
 }
 
-fn exec_command(command: &SystemCommand) -> Result<(), String> {
-    let status = Command::new(command.program)
-        .args(&command.args)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()
-        .map_err(|e| format!("Failed to execute '{}': {}", command.program, e))?;
+fn exec_command(program: &str, args: &[&str]) -> Result<(), String> {
+    let output = Command::new(program)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .and_then(|mut child| child.wait_with_output())
+        .map_err(|e| format!("Failed to execute '{}': {}", program, e))?;
 
-    if !status.success() {
-        Err(format!("'{}' failed with exit code: {:?}", command.program, status.code()))
-    } else {
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Log the output
+    log::info!("{}: {}", program, stdout);
+    if !stderr.is_empty() {
+        log::error!("{}: {}", program, stderr);
+    }
+
+    // Print to console
+    println!("{}", stdout);
+    if !stderr.is_empty() {
+        eprintln!("{}", stderr);
+    }
+
+    if output.status.success() {
         Ok(())
+    } else {
+        Err(format!("'{}' failed with exit code: {:?}", program, output.status.code()))
     }
 }
 fn execute_commands(commands: &[SystemCommand], error_messages: &mut Vec<String>) {
     for command in commands {
-        if let Err(e) = exec_command(command) {
+        if let Err(e) = exec_command(command.program, &command.args) {
             error_messages.push(e);
         }
     }
