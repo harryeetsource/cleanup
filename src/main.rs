@@ -32,14 +32,14 @@ fn execute_commands(commands: &[SystemCommand], error_messages: &mut Vec<String>
     }
 }
 fn perform_disk_cleanup(error_messages: &mut Vec<String>) {
-    println!("Performing disk cleanup.");
+    trace!("Performing disk cleanup.");
     let disk_cleanup_command = vec![
         SystemCommand { program: "cleanmgr", args: vec!["/sagerun:1"] },
     ];
     execute_commands(&disk_cleanup_command, error_messages);
 }
 fn cleanup_prefetch_files(system_root: &str, error_messages: &mut Vec<String>) {
-    println!("Deleting Prefetch files.");
+    trace!("Deleting Prefetch files.");
     let prefetch_command_str = format!("del /s /q /f {}\\Prefetch\\*", system_root);
     let prefetch_cleanup_command = vec![
         SystemCommand { program: "cmd", args: vec!["/c", &prefetch_command_str] },
@@ -47,7 +47,7 @@ fn cleanup_prefetch_files(system_root: &str, error_messages: &mut Vec<String>) {
     execute_commands(&prefetch_cleanup_command, error_messages);
 }
 fn cleanup_windows_update_cache(system_root: &str, error_messages: &mut Vec<String>) {
-    println!("Cleaning up Windows Update cache.");
+    trace!("Cleaning up Windows Update cache.");
     let windows_update_command_str = format!("rd /s /q {}", system_root.to_owned() + "\\SoftwareDistribution");
     let windows_update_cleanup_commands = vec![
         SystemCommand { program: "cmd", args: vec!["/c", &windows_update_command_str] },
@@ -59,7 +59,7 @@ fn cleanup_windows_update_cache(system_root: &str, error_messages: &mut Vec<Stri
     execute_commands(&windows_update_cleanup_commands, error_messages);
 }
 fn remove_temporary_files(temp: &str, system_root: &str, error_messages: &mut Vec<String>) {
-    println!("Removing temporary files.");
+    trace!("Removing temporary files.");
     let temp_files = format!("{}\\*", temp);
     let temp_system = format!("{}\\temp\\*", system_root);
     let delete_temp_commands = vec![
@@ -70,7 +70,7 @@ fn remove_temporary_files(temp: &str, system_root: &str, error_messages: &mut Ve
 }
 
 fn cleanup_font_cache(system_root: &str, error_messages: &mut Vec<String>) {
-    println!("Cleaning up font cache.");
+    trace!("Cleaning up font cache.");
     let font_cache_path = format!("{}\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache\\*", system_root);
     let font_cache_system_path = format!("{}\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache-System\\*", system_root);
     let font_cache_cleanup_commands = vec![
@@ -82,7 +82,7 @@ fn cleanup_font_cache(system_root: &str, error_messages: &mut Vec<String>) {
     execute_commands(&font_cache_cleanup_commands, error_messages);
 }
 fn disable_insecure_windows_features(error_messages: &mut Vec<String>) {
-    println!("Disabling insecure windows features.");
+    trace!("Disabling insecure windows features.");
     let windows_feature_disable_commands = vec![
         SystemCommand { program: "dism", args: vec!["/online", "/disable-feature", "/featurename:WindowsMediaPlayer"]},
         SystemCommand { program: "dism", args: vec!["/online", "/disable-feature", "/featurename:SMB1Protocol"]},
@@ -94,7 +94,7 @@ fn disable_insecure_windows_features(error_messages: &mut Vec<String>) {
     execute_commands(&windows_feature_disable_commands, error_messages);
 }
 fn enable_uac(error_messages: &mut Vec<String>) {
-    println!("Enable UAC");
+    trace!("Enable UAC");
     let enable_uac_commands = vec![
         SystemCommand { program: "reg", args: vec!["add", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", "/v", "EnableLUA", "/t", "REG_DWORD", "/d", "1", "/f"]},
         SystemCommand { program: "reg", args: vec!["add", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", "/v", "ConsentPromptBehaviorAdmin", "/t", "REG_DWORD", "/d", "2", "/f"]},
@@ -102,14 +102,14 @@ fn enable_uac(error_messages: &mut Vec<String>) {
     execute_commands(&enable_uac_commands, error_messages);
 }
 fn delete_old_log_files(error_messages: &mut Vec<String>) {
-    println!("Deleting log files older than 7 days");
+    trace!("Deleting log files older than 7 days");
     let delete_log_files_command = vec![
         SystemCommand { program: "forfiles", args: vec!["/p", "C:\\Windows\\Logs", "/s", "/m", "*.log", "/d", "-7", "/c", "cmd /c del @path"] },
     ];
     execute_commands(&delete_log_files_command, error_messages);
 }
 fn enable_credential_guard(error_messages: &mut Vec<String>) {
-    println!("Enabling Credential Guard.");
+    trace!("Enabling Credential Guard.");
     let enable_credential_guard_commands = vec![
        SystemCommand { program: "reg", args: vec!["add", "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\LSA", "/v", "LsaCfgFlags", "/t", "REG_DWORD", "/d", "1", "/f"] },
        SystemCommand { program: "bcdedit", args: vec!["/set", "{0cb3b571-2f2e-4343-a879-d86a476d7215}", "loadoptions", "DISABLE-LSA-ISO,DISABLE-VSM"]},
@@ -119,7 +119,7 @@ fn enable_credential_guard(error_messages: &mut Vec<String>) {
     execute_commands(&enable_credential_guard_commands, error_messages);
 }
 fn enable_secure_boot(error_messages: &mut Vec<String>){
-    println!("Enabling Secure Boot");
+    trace!("Enabling Secure Boot");
     let secure_boot_init = vec![
         SystemCommand { program: "bcdedit", args: vec!["/set", "{default}", "bootmenupolicy", "Standard"]},
     
@@ -127,21 +127,21 @@ fn enable_secure_boot(error_messages: &mut Vec<String>){
     execute_commands(&secure_boot_init, error_messages);
 }
 fn enable_exploit_protection_settings(error_messages: &mut Vec<String>) {
-    println!("Enabling Exploit Protection settings");
+    trace!("Enabling Exploit Protection settings");
     let exploit_protection_command = vec![
         SystemCommand { program: "powershell", args: vec!["-command", "Set-ProcessMitigation -System -Enable DEP,SEHOP"] },
     ];
     execute_commands(&exploit_protection_command, error_messages);
 }
 fn enable_address_space_layout_randomization(error_messages: &mut Vec<String>) {
-    println!("Enabling Address Space Layout Randomization.");
+    trace!("Enabling Address Space Layout Randomization.");
     let aslr_command = vec![
         SystemCommand { program: "reg", args: vec!["add", "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management", "/v", "MoveImages", "/t", "REG_DWORD", "/d", "1", "/f"] },
     ];
     execute_commands(&aslr_command, error_messages);
 }
 fn optimize_system(error_messages: &mut Vec<String>) {
-    println!("Optimizing system.");
+    trace!("Optimizing system.");
     let optimization_commands = vec![
         SystemCommand { program: "powershell", args: vec!["-command", "Optimize-Volume -DriveLetter C -Defrag -ReTrim"] },
         SystemCommand { program: "powershell", args: vec!["-command", "Optimize-Volume -DriveLetter C -Retrim"] },
@@ -152,14 +152,14 @@ fn optimize_system(error_messages: &mut Vec<String>) {
     execute_commands(&optimization_commands, error_messages);
 }
 fn enable_data_execution_prevention(error_messages: &mut Vec<String>) {
-    println!("Enabling Data Execution Prevention (DEP)");
+    trace!("Enabling Data Execution Prevention (DEP)");
     let dep_command = vec![
         SystemCommand { program: "bcdedit", args: vec!["/set", "nx", "AlwaysOn"] },
     ];
     execute_commands(&dep_command, error_messages);
 }
 fn disable_office_macros(error_messages: &mut Vec<String>) {
-    println!("Disabling Microsoft Office macros by default");
+    trace!("Disabling Microsoft Office macros by default");
     let macro_disable_commands = vec![
         SystemCommand { program: "reg", args: vec!["add", "HKEY_CURRENT_USER\\Software\\Microsoft\\Office\\16.0\\Excel\\Security", "/v", "VBAWarnings", "/t", "REG_DWORD", "/d", "4", "/f"] },
         SystemCommand { program: "reg", args: vec!["add", "HKEY_CURRENT_USER\\Software\\Microsoft\\Office\\16.0\\PowerPoint\\Security", "/v", "VBAWarnings", "/t", "REG_DWORD", "/d", "4", "/f"]},
@@ -169,7 +169,7 @@ fn disable_office_macros(error_messages: &mut Vec<String>) {
     execute_commands(&macro_disable_commands, error_messages);
 }
 fn enable_windows_defender_realtime_protection(error_messages: &mut Vec<String>){
-    println!("Enabling Windows Defender Realtime Protection Features");
+    trace!("Enabling Windows Defender Realtime Protection Features");
     let windows_def_rt_protection = vec![
         SystemCommand { program: "reg", args: vec!["add", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows Defender", "/v", "DisableAntiSpyware", "/t", "REG_DWORD", "/d", "0", "/f"]},
         SystemCommand { program: "reg", args: vec!["add", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection", "/v", "DisableBehaviorMonitoring", "/t", "REG_DWORD", "/d", "0", "/f"]},
@@ -180,7 +180,7 @@ fn enable_windows_defender_realtime_protection(error_messages: &mut Vec<String>)
     execute_commands(&windows_def_rt_protection, error_messages);
 }
 fn restrict_lsa_access(error_messages: &mut Vec<String>){
-    println!("Restricting LSA access");
+    trace!("Restricting LSA access");
     let recycle_bin = format!("{}\\$Recycle.Bin", std::env::var("systemdrive").unwrap());
     let lsa_commands = vec![
         SystemCommand { program: "reg", args: vec!["add", "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Lsa", "/v", "RestrictAnonymous", "/t", "REG_DWORD", "/d", "1", "/f"]},
@@ -196,7 +196,7 @@ fn restrict_lsa_access(error_messages: &mut Vec<String>){
     execute_commands(&lsa_commands, error_messages);
 }
 fn fix_components(error_messages: &mut Vec<String>){
-    println!("Checking for system file componentstore corruption");
+    trace!("Checking for system file componentstore corruption");
     let sfc_commands = vec![
         SystemCommand { program: "dism", args: vec!["/online", "/cleanup-image", "/startcomponentcleanup"] },
         SystemCommand { program: "dism", args: vec!["/online", "/cleanup-image", "/restorehealth"] },
@@ -206,14 +206,14 @@ fn fix_components(error_messages: &mut Vec<String>){
     execute_commands(&sfc_commands, error_messages);
 }
 fn enable_secure_boot_step_2(error_messages: &mut Vec<String>) {
-    println!("Enabling secure boot-step 2.");
+    trace!("Enabling secure boot-step 2.");
     let secure_boot_step_2_command = vec![
         SystemCommand { program: "powershell", args: vec!["-command", "Confirm-SecureBootUEFI"] },
     ];
     execute_commands(&secure_boot_step_2_command, error_messages);
 }
 fn update_drivers(error_messages: &mut Vec<String>){
-    println!("Checking for signed driver updates");
+    trace!("Checking for signed driver updates");
     let driver_update_command = vec![
         SystemCommand { program: "powershell", args: vec!["-command", "Get-WmiObject Win32_PnPSignedDriver | where {$_.DeviceName -like '*'} | foreach {pnputil /add-driver $_.InfName /install}"]},
 
@@ -281,7 +281,7 @@ fn main() -> Result<(), String> {
    let _ = execute!(std::io::stdout(), ResetColor);
    if !error_messages.is_empty() {
     for error_message in error_messages {
-        println!("Error: {}", error_message);
+        error!("Error: {}", error_message);
     }
     return Err("Some tasks failed".to_string());
 }
