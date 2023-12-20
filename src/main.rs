@@ -16,7 +16,7 @@ fn exec_command(program: &str, args: &[&str]) -> Result<(), String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .and_then(|mut child| child.wait_with_output())
+        .and_then(| child| child.wait_with_output())
         .map_err(|e| format!("Failed to execute '{}': {}", program, e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
