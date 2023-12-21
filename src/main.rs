@@ -550,6 +550,15 @@ fn enable_full_memory_dumps(error_messages: &mut Vec<String>) {
 
     execute_commands(&registry_commands, error_messages);
 }
+fn disable_ipv6(error_messages: &mut Vec<String>) {
+    trace!("Disabling IPv6 on all interfaces.");
+    let disable_ipv6_command_str = "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters' -Name 'DisabledComponents' -Value 0xFF";
+    let disable_ipv6_command = vec![SystemCommand {
+        program: "powershell",
+        args: vec!["-command", disable_ipv6_command_str],
+    }];
+    execute_commands(&disable_ipv6_command, error_messages);
+}
 
 fn setup_logging() -> Result<(), fern::InitError> {
     fern::Dispatch
@@ -608,6 +617,7 @@ fn main() -> Result<(), String> {
     fix_components(&mut error_messages);
     update_drivers(&mut error_messages);
     enable_full_memory_dumps(&mut error_messages);
+    disable_ipv6(&mut error_messages);
     // Handle errors
     let _ = execute!(std::io::stdout(), ResetColor);
     if !error_messages.is_empty() {
