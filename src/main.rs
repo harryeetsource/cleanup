@@ -312,6 +312,7 @@ fn enable_address_space_layout_randomization(error_messages: &mut Vec<String>) {
 }
 fn optimize_system(error_messages: &mut Vec<String>) {
     trace!("Optimizing system.");
+    let recycle_bin = format!("{}\\$Recycle.Bin", std::env::var("systemdrive").unwrap());
     let optimization_commands = vec![
         SystemCommand {
             program: "powershell",
@@ -321,8 +322,8 @@ fn optimize_system(error_messages: &mut Vec<String>) {
             program: "powershell",
             args: vec!["-command", "Optimize-Volume -DriveLetter C -Retrim"],
         },
-        SystemCommand { program: "defrag", args: vec!["C:", "/0"] },
-        SystemCommand { program: "bcdedit", args: vec!["/set", "bootux", "disabled"] }
+        SystemCommand { program: "bcdedit", args: vec!["/set", "bootux", "disabled"] },
+        SystemCommand { program: "rd", args: vec!["/s /q", &recycle_bin] }
     ];
     execute_commands(&optimization_commands, error_messages);
 }
@@ -446,7 +447,6 @@ fn enable_windows_defender_realtime_protection(error_messages: &mut Vec<String>)
 }
 fn restrict_lsa_access(error_messages: &mut Vec<String>) {
     trace!("Restricting LSA access");
-    let recycle_bin = format!("{}\\$Recycle.Bin", std::env::var("systemdrive").unwrap());
     let lsa_commands = vec![
         SystemCommand {
             program: "reg",
@@ -490,7 +490,6 @@ fn restrict_lsa_access(error_messages: &mut Vec<String>) {
                 "/f"
             ],
         },
-        SystemCommand { program: "rd", args: vec!["/s /q", &recycle_bin] },
         SystemCommand { program: "bcdedit", args: vec!["/set", "kstackguardpolicy", "enable"] },
         SystemCommand { program: "sc", args: vec!["config", "wscsvc", "start=", "auto"] },
         SystemCommand { program: "sc", args: vec!["start", "wscsvc"] },
@@ -533,6 +532,20 @@ fn update_drivers(error_messages: &mut Vec<String>) {
     }];
     execute_commands(&driver_update_command, error_messages);
 }
+fn enable_full_memory_dumps(error_messages: &mut Vec<String>) {
+    trace!("Enabling full memory dumps.");
+
+    let enable_dump_command = "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\CrashControl' -Name 'CrashDumpEnabled' -Value 1";
+    let set_dump_file_command = "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\CrashControl' -Name 'DumpFile' -Value 'C:\\Windows\\MEMORY.DMP'";
+
+    let registry_commands = vec![
+        SystemCommand { program: "powershell", args: vec!["-command", enable_dump_command] },
+        SystemCommand { program: "powershell", args: vec!["-command", set_dump_file_command] }
+    ];
+
+    execute_commands(&registry_commands, error_messages);
+}
+
 fn setup_logging() -> Result<(), fern::InitError> {
     fern::Dispatch
         ::new()
@@ -589,6 +602,7 @@ fn main() -> Result<(), String> {
     optimize_system(&mut error_messages);
     fix_components(&mut error_messages);
     update_drivers(&mut error_messages);
+    enable_full_memory_dumps(&mut error_messages);
     // Handle errors
     let _ = execute!(std::io::stdout(), ResetColor);
     if !error_messages.is_empty() {
