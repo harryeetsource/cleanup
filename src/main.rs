@@ -16,7 +16,7 @@ fn exec_command(program: &str, args: &[&str]) -> Result<(), String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .and_then(| child| child.wait_with_output())
+        .and_then(|child| child.wait_with_output())
         .map_err(|e| format!("Failed to execute '{}': {}", program, e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -81,32 +81,40 @@ fn cleanup_windows_update_cache(system_root: &str, error_messages: &mut Vec<Stri
 }
 fn remove_temporary_files(temp: &str, system_root: &str, error_messages: &mut Vec<String>) {
     trace!("Removing temporary files.");
-    let temp_files = format!("{}\\*", temp);
-    let temp_system = format!("{}\\temp\\*", system_root);
+
+    let temp_files_pattern = format!("{}\\*", temp);
+    let temp_system_pattern = format!("{}\\temp\\*", system_root);
+
+    let temp_files_command = format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", temp_files_pattern);
+    let temp_system_command = format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", temp_system_pattern);
+
     let delete_temp_commands = vec![
-        SystemCommand { program: "del", args: vec!["/s", "/q", &temp_files] },
-        SystemCommand { program: "del", args: vec!["/s", "/q", &temp_system] }
+        SystemCommand { program: "powershell", args: vec!["-command", &temp_files_command] },
+        SystemCommand { program: "powershell", args: vec!["-command", &temp_system_command] }
     ];
+
     execute_commands(&delete_temp_commands, error_messages);
 }
 
+
+
 fn cleanup_font_cache(system_root: &str, error_messages: &mut Vec<String>) {
     trace!("Cleaning up font cache.");
-    let font_cache_path =
-        format!("{}\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache\\*", system_root);
-    let font_cache_system_path =
-        format!("{}\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache-System\\*", system_root);
+    let font_cache_path = format!("{}\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache\\*", system_root);
+    let font_cache_system_path = format!("{}\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache-System\\*", system_root);
+
+    let remove_font_cache_command = format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", font_cache_path);
+    let remove_font_cache_system_command = format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", font_cache_system_path);
+
     let font_cache_cleanup_commands = vec![
-        SystemCommand { program: "net", args: vec!["stop", "fontcache"] },
-        SystemCommand { program: "del", args: vec!["/f", "/s", "/q", "/a", &font_cache_path] },
-        SystemCommand {
-            program: "del",
-            args: vec!["/f", "/s", "/q", "/a", &font_cache_system_path],
-        },
-        SystemCommand { program: "net", args: vec!["start", "fontcache"] }
+        SystemCommand { program: "powershell", args: vec!["-command", "Stop-Service -Name 'fontcache' -Force"] },
+        SystemCommand { program: "powershell", args: vec!["-command", &remove_font_cache_command] },
+        SystemCommand { program: "powershell", args: vec!["-command", &remove_font_cache_system_command] },
+        SystemCommand { program: "powershell", args: vec!["-command", "Start-Service -Name 'fontcache'"] }
     ];
     execute_commands(&font_cache_cleanup_commands, error_messages);
 }
+
 fn disable_insecure_windows_features(error_messages: &mut Vec<String>) {
     trace!("Disabling insecure windows features.");
     let windows_feature_disable_commands = vec![
