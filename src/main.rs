@@ -57,13 +57,15 @@ fn perform_disk_cleanup(error_messages: &mut Vec<String>) {
 }
 fn cleanup_prefetch_files(system_root: &str, error_messages: &mut Vec<String>) {
     trace!("Deleting Prefetch files.");
-    let prefetch_command_str = format!("del /s /q /f {}\\Prefetch\\*", system_root);
+    let prefetch_path = format!("{}\\Prefetch\\*", system_root);
+    let remove_prefetch_command_str = format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", prefetch_path);
     let prefetch_cleanup_command = vec![SystemCommand {
-        program: "cmd",
-        args: vec!["/c", &prefetch_command_str],
+        program: "powershell",
+        args: vec!["-command", &remove_prefetch_command_str],
     }];
     execute_commands(&prefetch_cleanup_command, error_messages);
 }
+
 fn cleanup_windows_update_cache(system_root: &str, error_messages: &mut Vec<String>) {
     trace!("Cleaning up Windows Update cache.");
     let windows_update_command_str = format!(
@@ -312,7 +314,8 @@ fn enable_address_space_layout_randomization(error_messages: &mut Vec<String>) {
 }
 fn optimize_system(error_messages: &mut Vec<String>) {
     trace!("Optimizing system.");
-    let recycle_bin = format!("{}\\$Recycle.Bin", std::env::var("systemdrive").unwrap());
+    let clear_recycle_bin_command = "Clear-RecycleBin -Confirm:$false -Force";
+
     let optimization_commands = vec![
         SystemCommand {
             program: "powershell",
@@ -323,7 +326,9 @@ fn optimize_system(error_messages: &mut Vec<String>) {
             args: vec!["-command", "Optimize-Volume -DriveLetter C -Retrim"],
         },
         SystemCommand { program: "bcdedit", args: vec!["/set", "bootux", "disabled"] },
-        SystemCommand { program: "rd", args: vec!["/s /q", &recycle_bin] }
+        SystemCommand {
+            program: "powershell",
+            args: vec!["-command", clear_recycle_bin_command]} ,
     ];
     execute_commands(&optimization_commands, error_messages);
 }
