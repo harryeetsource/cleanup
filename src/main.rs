@@ -160,7 +160,7 @@ fn disable_insecure_windows_features(error_messages: &mut Vec<String>) {
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer",
+                "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer",
                 "/v",
                 "NoDriveTypeAutoRun",
                 "/t",
@@ -508,6 +508,10 @@ fn fix_components(error_messages: &mut Vec<String>) {
         SystemCommand {
             program: "dism",
             args: vec!["/online", "/cleanup-image", "/startcomponentcleanup"],
+        },
+        SystemCommand {
+            program: "dism",
+            args: vec!["/online", "/cleanup-image", "/startcomponentcleanup", "/resetbase"],
         },
         SystemCommand {
             program: "dism",
