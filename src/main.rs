@@ -598,7 +598,7 @@ fn main() -> Result<(), String> {
     let temp = env::var("TEMP").expect("Failed to get temp directory");
     let mut error_messages: Vec<String> = Vec::new();
     // Execute initial series of commands
-
+    fix_components(&mut error_messages);
     cleanup_prefetch_files(&system_root, &mut error_messages);
     cleanup_windows_update_cache(&system_root, &mut error_messages);
     perform_disk_cleanup(&mut error_messages);
@@ -618,7 +618,7 @@ fn main() -> Result<(), String> {
     enable_windows_defender_realtime_protection(&mut error_messages);
     restrict_lsa_access(&mut error_messages);
     optimize_system(&mut error_messages);
-    fix_components(&mut error_messages);
+    
     update_drivers(&mut error_messages);
     enable_full_memory_dumps(&mut error_messages);
     disable_ipv6(&mut error_messages);
