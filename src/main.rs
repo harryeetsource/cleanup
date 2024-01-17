@@ -283,7 +283,12 @@ fn enable_secure_boot(error_messages: &mut Vec<String>) {
     let secure_boot_init = vec![SystemCommand {
         program: "bcdedit",
         args: vec!["/set", "{default}", "bootmenupolicy", "Standard"],
-    }];
+    },
+    SystemCommand {
+        program: "bcdedit",
+        args: vec!["/set", "{globalsettings}", "custom:16000075", "true"],
+    }
+    ];
     execute_commands(&secure_boot_init, error_messages);
 }
 fn enable_exploit_protection_settings(error_messages: &mut Vec<String>) {
