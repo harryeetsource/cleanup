@@ -132,7 +132,7 @@ fn disable_insecure_windows_features(error_messages: &mut Vec<String>) {
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server",
+                "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server",
                 "/v",
                 "fDenyTSConnections",
                 "/t",
@@ -146,7 +146,7 @@ fn disable_insecure_windows_features(error_messages: &mut Vec<String>) {
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Remote Assistance",
+                "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Remote Assistance",
                 "/v",
                 "fAllowToGetHelp",
                 "/t",
@@ -160,7 +160,7 @@ fn disable_insecure_windows_features(error_messages: &mut Vec<String>) {
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer",
+                "HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer",
                 "/v",
                 "NoDriveTypeAutoRun",
                 "/t",
@@ -174,7 +174,7 @@ fn disable_insecure_windows_features(error_messages: &mut Vec<String>) {
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient",
+                "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient",
                 "/v",
                 "EnableMulticast",
                 "/t",
@@ -194,7 +194,7 @@ fn enable_uac(error_messages: &mut Vec<String>) {
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",
+                "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",
                 "/v",
                 "EnableLUA",
                 "/t",
@@ -208,7 +208,7 @@ fn enable_uac(error_messages: &mut Vec<String>) {
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",
+                "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System",
                 "/v",
                 "ConsentPromptBehaviorAdmin",
                 "/t",
@@ -246,7 +246,7 @@ fn enable_credential_guard(error_messages: &mut Vec<String>) {
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\LSA",
+                "HKLM\\SYSTEM\\CurrentControlSet\\Control\\LSA",
                 "/v",
                 "LsaCfgFlags",
                 "/t",
@@ -305,7 +305,7 @@ fn enable_address_space_layout_randomization(error_messages: &mut Vec<String>) {
         program: "reg",
         args: vec![
             "add",
-            "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",
+            "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",
             "/v",
             "MoveImages",
             "/t",
@@ -352,7 +352,7 @@ fn disable_office_macros(error_messages: &mut Vec<String>) {
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_CURRENT_USER\\Software\\Microsoft\\Office\\16.0\\Excel\\Security",
+                "HKCU\\Software\\Microsoft\\Office\\16.0\\Excel\\Security",
                 "/v",
                 "VBAWarnings",
                 "/t",
@@ -366,7 +366,7 @@ fn disable_office_macros(error_messages: &mut Vec<String>) {
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_CURRENT_USER\\Software\\Microsoft\\Office\\16.0\\PowerPoint\\Security",
+                "HKCU\\Software\\Microsoft\\Office\\16.0\\PowerPoint\\Security",
                 "/v",
                 "VBAWarnings",
                 "/t",
@@ -380,7 +380,7 @@ fn disable_office_macros(error_messages: &mut Vec<String>) {
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_CURRENT_USER\\Software\\Microsoft\\Office\\16.0\\Word\\Security",
+                "HKCU\\Software\\Microsoft\\Office\\16.0\\Word\\Security",
                 "/v",
                 "VBAWarnings",
                 "/t",
@@ -400,7 +400,7 @@ fn enable_windows_defender_realtime_protection(error_messages: &mut Vec<String>)
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows Defender",
+                "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows Defender",
                 "/v",
                 "DisableAntiSpyware",
                 "/t",
@@ -414,7 +414,7 @@ fn enable_windows_defender_realtime_protection(error_messages: &mut Vec<String>)
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection",
+                "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection",
                 "/v",
                 "DisableBehaviorMonitoring",
                 "/t",
@@ -428,7 +428,7 @@ fn enable_windows_defender_realtime_protection(error_messages: &mut Vec<String>)
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection",
+                "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection",
                 "/v",
                 "DisableOnAccessProtection",
                 "/t",
@@ -442,7 +442,7 @@ fn enable_windows_defender_realtime_protection(error_messages: &mut Vec<String>)
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection",
+                "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows Defender\\Real-Time Protection",
                 "/v",
                 "DisableScanOnRealtimeEnable",
                 "/t",
@@ -462,7 +462,7 @@ fn restrict_lsa_access(error_messages: &mut Vec<String>) {
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Lsa",
+                "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa",
                 "/v",
                 "RestrictAnonymous",
                 "/t",
@@ -476,7 +476,7 @@ fn restrict_lsa_access(error_messages: &mut Vec<String>) {
             program: "reg",
             args: vec![
                 "add",
-                "HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows\\DeliveryOptimization",
+                "HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DeliveryOptimization",
                 "/v",
                 "DODownloadMode",
                 "/t",
