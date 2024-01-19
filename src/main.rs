@@ -5,6 +5,8 @@ use crossterm::execute;
 use crossterm::style::{ Color, ResetColor, SetForegroundColor };
 use std::fs::OpenOptions;
 use std::io::{ self, Read };
+use regex::Regex;
+use std::io::{BufRead, BufReader};
 struct SystemCommand<'a> {
     program: &'a str,
     args: Vec<&'a str>,
@@ -241,6 +243,14 @@ fn delete_old_log_files(error_messages: &mut Vec<String>) {
 }
 fn enable_credential_guard(error_messages: &mut Vec<String>) {
     trace!("Enabling Credential Guard.");
+     // Retrieve the bootloader GUID
+     let bootloader_guid = match get_bootloader_guid() {
+        Ok(guid) => guid,
+        Err(e) => {
+            error_messages.push(format!("Failed to get bootloader GUID: {}", e));
+            return;
+        }
+    };
     let enable_credential_guard_commands = vec![
         SystemCommand {
             program: "reg",
@@ -260,7 +270,7 @@ fn enable_credential_guard(error_messages: &mut Vec<String>) {
             program: "bcdedit",
             args: vec![
                 "/set",
-                "{0cb3b571-2f2e-4343-a879-d86a476d7215}",
+                &bootloader_guid,
                 "loadoptions",
                 "DISABLE-LSA-ISO,DISABLE-VSM"
             ],
@@ -269,7 +279,7 @@ fn enable_credential_guard(error_messages: &mut Vec<String>) {
             program: "bcdedit",
             args: vec![
                 "/set",
-                "{0cb3b571-2f2e-4343-a879-d86a476d7215}",
+                &bootloader_guid,
                 "device",
                 "path",
                 "\\EFI\\Microsoft\\Boot\\SecConfig.efi"
@@ -287,6 +297,10 @@ fn enable_secure_boot(error_messages: &mut Vec<String>) {
     SystemCommand {
         program: "bcdedit",
         args: vec!["/set", "{globalsettings}", "custom:16000075", "true"],
+    },
+    SystemCommand {
+        program: "bcdedit",
+        args: vec!["/set", "{bootmgr}", "path", "\\EFI\\Microsoft\\Boot\\bootmgfw.efi"],
     }
     ];
     execute_commands(&secure_boot_init, error_messages);
@@ -592,6 +606,35 @@ fn setup_logging() -> Result<(), fern::InitError> {
         .apply()?;
 
     Ok(())
+}
+fn get_bootloader_guid() -> Result<String, String> {
+    let output = Command::new("bcdedit")
+        .arg("/enum")
+        .stdout(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to start bcdedit: {}", e))?
+        .stdout
+        .ok_or_else(|| "Could not capture standard output.".to_string())?;
+
+    let reader = BufReader::new(output);
+    let re = Regex::new(r"identifier\s+\{([0-9a-fA-F-]+)\}").unwrap();
+    let mut found_windows_boot_loader = false;
+
+    for line in reader.lines() {
+        let line = line.map_err(|e| format!("Error reading output: {}", e))?;
+
+        if found_windows_boot_loader {
+            if let Some(caps) = re.captures(&line) {
+                return Ok(caps.get(1).unwrap().as_str().to_string());
+            }
+        }
+
+        if line.contains("Windows Boot Loader") {
+            found_windows_boot_loader = true;
+        }
+    }
+
+    Err("No GUID found for Windows Boot Loader in bcdedit output.".to_string())
 }
 fn main() -> Result<(), String> {
     if let Err(e) = setup_logging() {
