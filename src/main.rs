@@ -7,6 +7,7 @@ use std::fs::OpenOptions;
 use std::io::{ self, Read };
 use regex::Regex;
 use std::io::{BufRead, BufReader};
+#[derive(Debug)]
 struct SystemCommand<'a> {
     program: &'a str,
     args: Vec<&'a str>,
@@ -19,7 +20,7 @@ fn exec_command(program: &str, args: &[&str]) -> Result<(), String> {
         .stderr(Stdio::piped())
         .spawn()
         .and_then(|child| child.wait_with_output())
-        .map_err(|e| format!("Failed to execute '{}': {}", program, e))?;
+        .map_err(|e| format!("Failed to start '{}': {}", program, e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -39,16 +40,20 @@ fn exec_command(program: &str, args: &[&str]) -> Result<(), String> {
     if output.status.success() {
         Ok(())
     } else {
-        Err(format!("'{}' failed with exit code: {:?}", program, output.status.code()))
+        Err(format!(
+            "'{}' with arguments {:?} failed with exit code {:?}: {}",
+            program, args, output.status.code(), stderr
+        ))
     }
 }
 fn execute_commands(commands: &[SystemCommand], error_messages: &mut Vec<String>) {
     for command in commands {
         if let Err(e) = exec_command(command.program, &command.args) {
-            error_messages.push(e);
+            error_messages.push(format!("Error executing {:?}: {}", command, e));
         }
     }
 }
+
 fn perform_disk_cleanup(error_messages: &mut Vec<String>) {
     trace!("Performing disk cleanup.");
     let disk_cleanup_command = vec![SystemCommand {
@@ -243,14 +248,6 @@ fn delete_old_log_files(error_messages: &mut Vec<String>) {
 }
 fn enable_credential_guard(error_messages: &mut Vec<String>) {
     trace!("Enabling Credential Guard.");
-     // Retrieve the bootloader GUID
-     let bootloader_guid = match get_bootloader_guid() {
-        Ok(guid) => guid,
-        Err(e) => {
-            error_messages.push(format!("Failed to get bootloader GUID: {}", e));
-            return;
-        }
-    };
     let enable_credential_guard_commands = vec![
         SystemCommand {
             program: "reg",
@@ -270,7 +267,7 @@ fn enable_credential_guard(error_messages: &mut Vec<String>) {
             program: "bcdedit",
             args: vec![
                 "/set",
-                &bootloader_guid,
+               "{bootmgr}",
                 "loadoptions",
                 "DISABLE-LSA-ISO,DISABLE-VSM"
             ],
@@ -279,7 +276,7 @@ fn enable_credential_guard(error_messages: &mut Vec<String>) {
             program: "bcdedit",
             args: vec![
                 "/set",
-                &bootloader_guid,
+                "{bootmgr}",
                 "device",
                 "path",
                 "\\EFI\\Microsoft\\Boot\\SecConfig.efi"
@@ -582,7 +579,34 @@ fn disable_ipv6(error_messages: &mut Vec<String>) {
     }];
     execute_commands(&disable_ipv6_command, error_messages);
 }
+fn bootloader(error_messages: &mut Vec<String>) {
+     // Retrieve the bootloader GUID
+     let bootloader_guid = match get_bootloader_guid() {
+        Ok(guid) => guid,
+        Err(e) => {
+            error_messages.push(format!("Failed to get bootloader GUID: {}", e));
+            return;
+        }
+    };
+    let loader_commands = 
+    SystemCommand {
+        program: "bcdedit",
+        args: vec![
+            "/set",
+            &bootloader_guid,
+            "integritychecks",
+            "on"
+        ],
+    },
+    SystemCommand {
+        program: "bcdedit",
+        args: vec!["/set", &bootloader_guid, "hypervisorlaunchtype", "auto"],
+    },
+    
+    execute_commands(&loader_commands, error_messages);
+    
 
+}
 fn setup_logging() -> Result<(), fern::InitError> {
     fern::Dispatch
         ::new()
@@ -609,7 +633,7 @@ fn setup_logging() -> Result<(), fern::InitError> {
 }
 fn get_bootloader_guid() -> Result<String, String> {
     let output = Command::new("bcdedit")
-        .arg("/enum")
+        .args(&["/enum", "all"])
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to start bcdedit: {}", e))?
@@ -618,19 +642,17 @@ fn get_bootloader_guid() -> Result<String, String> {
 
     let reader = BufReader::new(output);
     let re = Regex::new(r"identifier\s+\{([0-9a-fA-F-]+)\}").unwrap();
-    let mut found_windows_boot_loader = false;
+    let mut is_windows_boot_loader_section = false;
 
     for line in reader.lines() {
         let line = line.map_err(|e| format!("Error reading output: {}", e))?;
 
-        if found_windows_boot_loader {
+        if line.contains("Windows Boot Loader") {
+            is_windows_boot_loader_section = true;
+        } else if line.contains("identifier") && is_windows_boot_loader_section {
             if let Some(caps) = re.captures(&line) {
                 return Ok(caps.get(1).unwrap().as_str().to_string());
             }
-        }
-
-        if line.contains("Windows Boot Loader") {
-            found_windows_boot_loader = true;
         }
     }
 
