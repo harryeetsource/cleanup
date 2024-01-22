@@ -588,7 +588,7 @@ fn bootloader(error_messages: &mut Vec<String>) {
             return;
         }
     };
-    let loader_commands = 
+    let loader_commands = vec![
     SystemCommand {
         program: "bcdedit",
         args: vec![
@@ -601,7 +601,7 @@ fn bootloader(error_messages: &mut Vec<String>) {
     SystemCommand {
         program: "bcdedit",
         args: vec!["/set", &bootloader_guid, "hypervisorlaunchtype", "auto"],
-    },
+    }];
     
     execute_commands(&loader_commands, error_messages);
     
