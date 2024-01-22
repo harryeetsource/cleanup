@@ -6,7 +6,7 @@ use crossterm::style::{ Color, ResetColor, SetForegroundColor };
 use std::fs::OpenOptions;
 use std::io::{ self, Read };
 use regex::Regex;
-use std::io::{BufRead, BufReader};
+use std::io::{ BufRead, BufReader };
 #[derive(Debug)]
 struct SystemCommand<'a> {
     program: &'a str,
@@ -40,10 +40,15 @@ fn exec_command(program: &str, args: &[&str]) -> Result<(), String> {
     if output.status.success() {
         Ok(())
     } else {
-        Err(format!(
-            "'{}' with arguments {:?} failed with exit code {:?}: {}",
-            program, args, output.status.code(), stderr
-        ))
+        Err(
+            format!(
+                "'{}' with arguments {:?} failed with exit code {:?}: {}",
+                program,
+                args,
+                output.status.code(),
+                stderr
+            )
+        )
     }
 }
 fn execute_commands(commands: &[SystemCommand], error_messages: &mut Vec<String>) {
@@ -65,7 +70,8 @@ fn perform_disk_cleanup(error_messages: &mut Vec<String>) {
 fn cleanup_prefetch_files(system_root: &str, error_messages: &mut Vec<String>) {
     trace!("Deleting Prefetch files.");
     let prefetch_path = format!("{}\\Prefetch\\*", system_root);
-    let remove_prefetch_command_str = format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", prefetch_path);
+    let remove_prefetch_command_str =
+        format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", prefetch_path);
     let prefetch_cleanup_command = vec![SystemCommand {
         program: "powershell",
         args: vec!["-command", &remove_prefetch_command_str],
@@ -94,8 +100,10 @@ fn remove_temporary_files(temp: &str, system_root: &str, error_messages: &mut Ve
     let temp_files_pattern = format!("{}\\*", temp);
     let temp_system_pattern = format!("{}\\temp\\*", system_root);
 
-    let temp_files_command = format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", temp_files_pattern);
-    let temp_system_command = format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", temp_system_pattern);
+    let temp_files_command =
+        format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", temp_files_pattern);
+    let temp_system_command =
+        format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", temp_system_pattern);
 
     let delete_temp_commands = vec![
         SystemCommand { program: "powershell", args: vec!["-command", &temp_files_command] },
@@ -105,21 +113,32 @@ fn remove_temporary_files(temp: &str, system_root: &str, error_messages: &mut Ve
     execute_commands(&delete_temp_commands, error_messages);
 }
 
-
-
 fn cleanup_font_cache(system_root: &str, error_messages: &mut Vec<String>) {
     trace!("Cleaning up font cache.");
-    let font_cache_path = format!("{}\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache\\*", system_root);
-    let font_cache_system_path = format!("{}\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache-System\\*", system_root);
+    let font_cache_path =
+        format!("{}\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache\\*", system_root);
+    let font_cache_system_path =
+        format!("{}\\ServiceProfiles\\LocalService\\AppData\\Local\\FontCache-System\\*", system_root);
 
-    let remove_font_cache_command = format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", font_cache_path);
-    let remove_font_cache_system_command = format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", font_cache_system_path);
+    let remove_font_cache_command =
+        format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", font_cache_path);
+    let remove_font_cache_system_command =
+        format!("Remove-Item -Path '{}' -Recurse -Force -ErrorAction SilentlyContinue", font_cache_system_path);
 
     let font_cache_cleanup_commands = vec![
-        SystemCommand { program: "powershell", args: vec!["-command", "Stop-Service -Name 'fontcache' -Force"] },
+        SystemCommand {
+            program: "powershell",
+            args: vec!["-command", "Stop-Service -Name 'fontcache' -Force"],
+        },
         SystemCommand { program: "powershell", args: vec!["-command", &remove_font_cache_command] },
-        SystemCommand { program: "powershell", args: vec!["-command", &remove_font_cache_system_command] },
-        SystemCommand { program: "powershell", args: vec!["-command", "Start-Service -Name 'fontcache'"] }
+        SystemCommand {
+            program: "powershell",
+            args: vec!["-command", &remove_font_cache_system_command],
+        },
+        SystemCommand {
+            program: "powershell",
+            args: vec!["-command", "Start-Service -Name 'fontcache'"],
+        }
     ];
     execute_commands(&font_cache_cleanup_commands, error_messages);
 }
@@ -265,12 +284,7 @@ fn enable_credential_guard(error_messages: &mut Vec<String>) {
         },
         SystemCommand {
             program: "bcdedit",
-            args: vec![
-                "/set",
-               "{bootmgr}",
-                "loadoptions",
-                "DISABLE-LSA-ISO,DISABLE-VSM"
-            ],
+            args: vec!["/set", "{bootmgr}", "loadoptions", "DISABLE-LSA-ISO,DISABLE-VSM"],
         },
         SystemCommand {
             program: "bcdedit",
@@ -287,18 +301,19 @@ fn enable_credential_guard(error_messages: &mut Vec<String>) {
 }
 fn enable_secure_boot(error_messages: &mut Vec<String>) {
     trace!("Enabling Secure Boot");
-    let secure_boot_init = vec![SystemCommand {
-        program: "bcdedit",
-        args: vec!["/set", "{default}", "bootmenupolicy", "Standard"],
-    },
-    SystemCommand {
-        program: "bcdedit",
-        args: vec!["/set", "{globalsettings}", "custom:16000075", "true"],
-    },
-    SystemCommand {
-        program: "bcdedit",
-        args: vec!["/set", "{bootmgr}", "path", "\\EFI\\Microsoft\\Boot\\bootmgfw.efi"],
-    }
+    let secure_boot_init = vec![
+        SystemCommand {
+            program: "bcdedit",
+            args: vec!["/set", "{default}", "bootmenupolicy", "Standard"],
+        },
+        SystemCommand {
+            program: "bcdedit",
+            args: vec!["/set", "{globalsettings}", "custom:16000075", "true"],
+        },
+        SystemCommand {
+            program: "bcdedit",
+            args: vec!["/set", "{bootmgr}", "path", "\\EFI\\Microsoft\\Boot\\bootmgfw.efi"],
+        }
     ];
     execute_commands(&secure_boot_init, error_messages);
 }
@@ -344,7 +359,8 @@ fn optimize_system(error_messages: &mut Vec<String>) {
         SystemCommand { program: "bcdedit", args: vec!["/set", "bootux", "disabled"] },
         SystemCommand {
             program: "powershell",
-            args: vec!["-command", clear_recycle_bin_command]} ,
+            args: vec!["-command", clear_recycle_bin_command],
+        }
     ];
     execute_commands(&optimization_commands, error_messages);
 }
@@ -560,8 +576,10 @@ fn update_drivers(error_messages: &mut Vec<String>) {
 fn enable_full_memory_dumps(error_messages: &mut Vec<String>) {
     trace!("Enabling full memory dumps.");
 
-    let enable_dump_command = "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\CrashControl' -Name 'CrashDumpEnabled' -Value 1";
-    let set_dump_file_command = "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\CrashControl' -Name 'DumpFile' -Value 'C:\\Windows\\MEMORY.DMP'";
+    let enable_dump_command =
+        "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\CrashControl' -Name 'CrashDumpEnabled' -Value 1";
+    let set_dump_file_command =
+        "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\CrashControl' -Name 'DumpFile' -Value 'C:\\Windows\\MEMORY.DMP'";
 
     let registry_commands = vec![
         SystemCommand { program: "powershell", args: vec!["-command", enable_dump_command] },
@@ -572,7 +590,8 @@ fn enable_full_memory_dumps(error_messages: &mut Vec<String>) {
 }
 fn disable_ipv6(error_messages: &mut Vec<String>) {
     trace!("Disabling IPv6 on all interfaces.");
-    let disable_ipv6_command_str = "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters' -Name 'DisabledComponents' -Value 0xFF";
+    let disable_ipv6_command_str =
+        "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters' -Name 'DisabledComponents' -Value 0xFF";
     let disable_ipv6_command = vec![SystemCommand {
         program: "powershell",
         args: vec!["-command", disable_ipv6_command_str],
@@ -580,8 +599,8 @@ fn disable_ipv6(error_messages: &mut Vec<String>) {
     execute_commands(&disable_ipv6_command, error_messages);
 }
 fn bootloader(error_messages: &mut Vec<String>) {
-     // Retrieve the bootloader GUID
-     let bootloader_guid = match get_bootloader_guid() {
+    // Retrieve the bootloader GUID
+    let bootloader_guid = match get_bootloader_guid() {
         Ok(guid) => guid,
         Err(e) => {
             error_messages.push(format!("Failed to get bootloader GUID: {}", e));
@@ -589,23 +608,17 @@ fn bootloader(error_messages: &mut Vec<String>) {
         }
     };
     let loader_commands = vec![
-    SystemCommand {
-        program: "bcdedit",
-        args: vec![
-            "/set",
-            &bootloader_guid,
-            "integritychecks",
-            "on"
-        ],
-    },
-    SystemCommand {
-        program: "bcdedit",
-        args: vec!["/set", &bootloader_guid, "hypervisorlaunchtype", "auto"],
-    }];
-    
-    execute_commands(&loader_commands, error_messages);
-    
+        SystemCommand {
+            program: "bcdedit",
+            args: vec!["/set", &bootloader_guid, "integritychecks", "on"],
+        },
+        SystemCommand {
+            program: "bcdedit",
+            args: vec!["/set", &bootloader_guid, "hypervisorlaunchtype", "auto"],
+        }
+    ];
 
+    execute_commands(&loader_commands, error_messages);
 }
 fn setup_logging() -> Result<(), fern::InitError> {
     fern::Dispatch
@@ -637,8 +650,7 @@ fn get_bootloader_guid() -> Result<String, String> {
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to start bcdedit: {}", e))?
-        .stdout
-        .ok_or_else(|| "Could not capture standard output.".to_string())?;
+        .stdout.ok_or_else(|| "Could not capture standard output.".to_string())?;
 
     let reader = BufReader::new(output);
     let re = Regex::new(r"identifier\s+\{([0-9a-fA-F-]+)\}").unwrap();
@@ -688,7 +700,7 @@ fn main() -> Result<(), String> {
     enable_windows_defender_realtime_protection(&mut error_messages);
     restrict_lsa_access(&mut error_messages);
     optimize_system(&mut error_messages);
-    
+
     update_drivers(&mut error_messages);
     enable_full_memory_dumps(&mut error_messages);
     disable_ipv6(&mut error_messages);
