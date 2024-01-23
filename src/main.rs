@@ -364,14 +364,7 @@ fn optimize_system(error_messages: &mut Vec<String>) {
     ];
     execute_commands(&optimization_commands, error_messages);
 }
-fn enable_data_execution_prevention(error_messages: &mut Vec<String>) {
-    trace!("Enabling Data Execution Prevention (DEP)");
-    let dep_command = vec![SystemCommand {
-        program: "bcdedit",
-        args: vec!["/set", "nx", "AlwaysOn"],
-    }];
-    execute_commands(&dep_command, error_messages);
-}
+
 fn disable_office_macros(error_messages: &mut Vec<String>) {
     trace!("Disabling Microsoft Office macros by default");
     let macro_disable_commands = vec![
@@ -599,6 +592,7 @@ fn disable_ipv6(error_messages: &mut Vec<String>) {
     execute_commands(&disable_ipv6_command, error_messages);
 }
 fn bootloader(error_messages: &mut Vec<String>) {
+    trace!("Securing Windows Bootloader");
     // Retrieve the bootloader GUID
     let bootloader_guid = match get_bootloader_guid() {
         Ok(guid) => guid,
@@ -614,7 +608,19 @@ fn bootloader(error_messages: &mut Vec<String>) {
         },
         SystemCommand {
             program: "bcdedit",
-            args: vec!["/set", &bootloader_guid, "hypervisorlaunchtype", "auto"],
+            args: vec!["/set", "hypervisorlaunchtype", "auto"],
+        },
+        SystemCommand {
+            program: "bcdedit",
+            args: vec!["/set", &bootloader_guid, "bootintegrityservices", "enable"],
+        },
+        SystemCommand {
+            program: "bcdedit",
+            args: vec!["/set", &bootloader_guid, "elamdrivers", "enable"],
+        },
+        SystemCommand {
+            program: "bcdedit",
+            args: vec!["/set", &bootloader_guid, "nx", "AlwaysOn"]
         }
     ];
 
@@ -670,6 +676,35 @@ fn get_bootloader_guid() -> Result<String, String> {
 
     Err("No GUID found for Windows Boot Loader in bcdedit output.".to_string())
 }
+fn rename_pc(error_messages: &mut Vec<String>) {
+    let powershell_script = r#"
+    # Get the serial number from the BIOS
+    $serialNumber = (Get-WmiObject -Class Win32_BIOS).SerialNumber
+
+    # Get memory form factors (17: SODIMM, typical for laptops)
+    $memoryFormFactors = (Get-WmiObject -Class Win32_PhysicalMemory).FormFactor
+
+    # Determine device type (Desktop or Laptop) based on memory form factor
+    $deviceType = "DKP"
+    if (17 -in $memoryFormFactors) {
+        $deviceType = "LPT"
+    }
+
+    # Define the new computer name based on device type
+    $newName = "GLT-$deviceType-$serialNumber"
+
+    # Rename the computer
+    Rename-Computer -NewName $newName -Force -Restart
+    "#;
+
+    // Format the PowerShell script as a command-line argument
+    let script_argument = format!("-Command {}", powershell_script);
+
+    // Use `exec_command` to execute the PowerShell script
+    if let Err(e) = exec_command("powershell", &[&script_argument]) {
+        error_messages.push(format!("Error renaming PC: {}", e));
+    }
+}
 fn main() -> Result<(), String> {
     if let Err(e) = setup_logging() {
         eprintln!("Error setting up logging: {}", e);
@@ -692,7 +727,6 @@ fn main() -> Result<(), String> {
     delete_old_log_files(&mut error_messages);
     enable_credential_guard(&mut error_messages);
     enable_exploit_protection_settings(&mut error_messages);
-    enable_data_execution_prevention(&mut error_messages);
     enable_secure_boot(&mut error_messages);
     enable_secure_boot_step_2(&mut error_messages);
     disable_office_macros(&mut error_messages);
@@ -704,6 +738,7 @@ fn main() -> Result<(), String> {
     update_drivers(&mut error_messages);
     enable_full_memory_dumps(&mut error_messages);
     disable_ipv6(&mut error_messages);
+    bootloader(&mut error_messages);
     // Handle errors
     let _ = execute!(std::io::stdout(), ResetColor);
     if !error_messages.is_empty() {
@@ -712,6 +747,5 @@ fn main() -> Result<(), String> {
         }
         return Err("Some tasks failed".to_string());
     }
-
     Ok(())
 }
