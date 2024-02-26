@@ -594,33 +594,48 @@ fn disable_ipv6(error_messages: &mut Vec<String>) {
 fn bootloader(error_messages: &mut Vec<String>) {
     trace!("Securing Windows Bootloader");
     // Retrieve the bootloader GUID
-    let bootloader_guid = match get_bootloader_guid() {
+    let bootloader_guid_result = get_bootloader_guid();
+
+    let bootloader_guid = match bootloader_guid_result {
         Ok(guid) => guid,
         Err(e) => {
             error_messages.push(format!("Failed to get bootloader GUID: {}", e));
             return;
         }
     };
+
+    // Convert the bootloader GUID to a borrowed str (&str) for the lifetime of the call
+    let guid_str = bootloader_guid.as_str();
+
+    // Prepare commands, temporarily converting String arguments to &str within the same scope
     let loader_commands = vec![
         SystemCommand {
             program: "bcdedit",
-            args: vec!["/set", &bootloader_guid, "integritychecks", "on"],
+            args: vec!["/set", guid_str, "integritychecks", "on"],
         },
         SystemCommand {
             program: "bcdedit",
-            args: vec!["/set", "hypervisorlaunchtype", "auto"],
+            args: vec!["/set", guid_str, "hypervisoriommupolicy", "enable"],
         },
         SystemCommand {
             program: "bcdedit",
-            args: vec!["/set", &bootloader_guid, "bootintegrityservices", "enable"],
+            args: vec!["/set", guid_str, "hypervisorlaunchtype", "auto"],
         },
         SystemCommand {
             program: "bcdedit",
-            args: vec!["/set", &bootloader_guid, "elamdrivers", "enable"],
+            args: vec!["/set", guid_str, "bootintegrityservices", "enable"],
         },
         SystemCommand {
             program: "bcdedit",
-            args: vec!["/set", &bootloader_guid, "nx", "AlwaysOn"]
+            args: vec!["/set", guid_str, "elamdrivers", "enable"],
+        },
+        SystemCommand{
+            program: "bcdboot",
+            args: vec!["C:\\windows", "/m", guid_str],
+        },
+        SystemCommand {
+            program: "bcdedit",
+            args: vec!["/set", guid_str, "nx", "AlwaysOn"]
         }
     ];
 
