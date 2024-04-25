@@ -7,12 +7,18 @@ use std::fs::OpenOptions;
 use std::io::{ self, Read };
 use regex::Regex;
 use std::io::{ BufRead, BufReader };
+use winapi::um::processthreadsapi::GetCurrentThread;
+use core::ffi::c_ulong;
+use core::ptr;
+use winapi::um::winnt::HANDLE;
+const THREAD_SUSPEND_COUNT: c_ulong = 0x0000000A;
 #[derive(Debug)]
 struct SystemCommand<'a> {
     program: &'a str,
     args: Vec<&'a str>,
 }
-
+use std::error::Error;
+use std::thread;
 fn exec_command(program: &str, args: &[&str]) -> Result<(), String> {
     let output = Command::new(program)
         .args(args)
@@ -306,10 +312,12 @@ fn enable_secure_boot(error_messages: &mut Vec<String>) {
             program: "bcdedit",
             args: vec!["/set", "{default}", "bootmenupolicy", "Standard"],
         },
+        /*
         SystemCommand {
             program: "bcdedit",
             args: vec!["/set", "{globalsettings}", "custom:16000075", "true"],
         },
+        */
         SystemCommand {
             program: "bcdedit",
             args: vec!["/set", "{bootmgr}", "path", "\\EFI\\Microsoft\\Boot\\bootmgfw.efi"],
@@ -641,6 +649,167 @@ fn bootloader(error_messages: &mut Vec<String>) {
 
     execute_commands(&loader_commands, error_messages);
 }
+fn harden_system(error_messages: &mut Vec<String>) {
+let harden_commands = vec![
+    SystemCommand {
+        program: "netsh",
+        args: vec!["advfirewall", "set", "allprofiles", "state", "on"],
+    },
+    SystemCommand {
+        program: "reg",
+        args: vec![
+            "add",
+            "HKLM\\SYSTEM\\CurrentControlSet\\Services\\RemoteRegistry",
+            "/v",
+            "Start",
+            "/t",
+            "REG_DWORD",
+            "/d",
+            "4",
+            "/f",
+        ],
+    },
+    SystemCommand {
+        program: "reg",
+        args: vec![
+            "add",
+            "HKLM\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters",
+            "/v",
+            "SMB2",
+            "/t",
+            "REG_DWORD",
+            "/d",
+            "0",
+            "/f",
+        ],
+    },
+    SystemCommand {
+        program: "powershell",
+        args: vec![
+            "-command",
+            "Set-PSSessionConfiguration -Name Microsoft.PowerShell -showSecurityDescriptorUI",
+        ],
+    },
+    SystemCommand {
+        program: "reg",
+        args: vec![
+            "add",
+            "HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest",
+            "/v",
+            "UseLogonCredential",
+            "/t",
+            "REG_DWORD",
+            "/d",
+            "0",
+            "/f",
+        ],
+    },
+    SystemCommand {
+        program: "reg",
+        args: vec![
+            "add",
+            "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OEMInformation",
+            "/v",
+            "SecureFirmwareUpdate",
+            "/t",
+            "REG_DWORD",
+            "/d",
+            "1",
+            "/f",
+        ],
+    },
+    SystemCommand {
+        program: "reg",
+        args: vec![
+            "add",
+            "HKLM\\SYSTEM\\CurrentControlSet\\Services\\W32Time\\Config",
+            "/v",
+            "AnnounceFlags",
+            "/t",
+            "REG_DWORD",
+            "/d",
+            "5",
+            "/f",
+        ],
+    },
+    SystemCommand {
+        program: "reg",
+        args: vec![
+            "add",
+            "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Lsa\\MSV1_0",
+            "/v",
+            "NtlmMinClientSec",
+            "/t",
+            "REG_DWORD",
+            "/d",
+            "537395200",
+            "/f",
+        ],
+    },
+    
+    SystemCommand {
+    program: "reg",
+    args: vec![
+        "add",
+        "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",
+        "/v",
+        "ClearPageFileAtShutdown",
+        "/t",
+        "REG_DWORD",
+        "/d",
+        "1",
+        "/f",
+        ],
+    },
+    SystemCommand {
+    program: "reg",
+    args: vec![
+        "add",
+        "HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurePipeServers\\winreg",
+        "/f",
+        "/t",
+        "REG_DWORD",
+        "/v",
+        "AllowedPaths",
+        "/d",
+        "System\\CurrentControlSet\\Control",
+    ],
+    },
+
+    
+    SystemCommand {
+        program: "wevtutil",
+        args: vec!["sl", "Security", "/ca:O:BAG:SYD:(A;;0x7;;;BA)(A;;0x7;;;SO)"],
+    }
+    
+    ];
+    execute_commands(&harden_commands, error_messages);
+}
+fn disable_hibernation(){
+    let disable_hibernation = SystemCommand {
+        program: "reg",
+        args: vec![
+            "add",
+            "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Power",
+            "/v",
+            "HibernateEnabled",
+            "/t",
+            "REG_DWORD",
+            "/d",
+            "0",
+            "/f",
+        ],
+    };
+
+    // Since `exec_command` requires a slice, we convert args to a slice
+    let program = disable_hibernation.program;
+    let args = disable_hibernation.args;
+
+    match exec_command(program, &args) {
+        Ok(_) => println!("Hibernation disabled successfully."),
+        Err(e) => eprintln!("Failed to disable hibernation: {}", e),
+    }
+}
 fn setup_logging() -> Result<(), fern::InitError> {
     fern::Dispatch
         ::new()
@@ -665,43 +834,46 @@ fn setup_logging() -> Result<(), fern::InitError> {
 
     Ok(())
 }
-fn get_bootloader_guid() -> Result<String, String> {
+
+fn get_bootloader_guid() -> Result<String, Box<dyn Error>> {
     let output = Command::new("bcdedit")
         .args(&["/enum", "all"])
         .stdout(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to start bcdedit: {}", e))?
-        .stdout.ok_or_else(|| "Could not capture standard output.".to_string())?;
+        .spawn()?
+        .stdout.ok_or("Could not capture standard output.")?;
 
     let reader = BufReader::new(output);
-    let re = Regex::new(r"identifier\s+\{([0-9a-fA-F-]+)\}").unwrap();
+    let re = Regex::new(r"identifier\s+\{([0-9a-fA-F-]+)\}")?;
     let mut is_windows_boot_loader_section = false;
 
     for line in reader.lines() {
-        let line = line.map_err(|e| format!("Error reading output: {}", e))?;
+        let line = line?;
 
         if line.contains("Windows Boot Loader") {
             is_windows_boot_loader_section = true;
         } else if line.contains("identifier") && is_windows_boot_loader_section {
             if let Some(caps) = re.captures(&line) {
-                return Ok(caps.get(1).unwrap().as_str().to_string());
+                return caps.get(1)
+                           .map(|m| m.as_str().to_string())
+                           .ok_or_else(|| "Failed to extract GUID.".into());
             }
         }
     }
 
-    Err("No GUID found for Windows Boot Loader in bcdedit output.".to_string())
+    Err("No GUID found for Windows Boot Loader in bcdedit output.".into())
 }
+/*
 fn rename_pc(error_messages: &mut Vec<String>) {
     let powershell_script = r#"
     # Get the serial number from the BIOS
     $serialNumber = (Get-WmiObject -Class Win32_BIOS).SerialNumber
 
-    # Get memory form factors (17: SODIMM, typical for laptops)
+    # Get memory form factors (12: SODIMM, typical for laptops)
     $memoryFormFactors = (Get-WmiObject -Class Win32_PhysicalMemory).FormFactor
 
     # Determine device type (Desktop or Laptop) based on memory form factor
     $deviceType = "DKP"
-    if (17 -in $memoryFormFactors) {
+    if (12 -in $memoryFormFactors) {
         $deviceType = "LPT"
     }
 
@@ -720,6 +892,90 @@ fn rename_pc(error_messages: &mut Vec<String>) {
         error_messages.push(format!("Error renaming PC: {}", e));
     }
 }
+*/
+fn disable_games(error_messages: &mut Vec<String>){
+    let game_script = r#"
+    # Enhanced PowerShell script to disable/uninstall gaming features and services at HKLM level
+
+# Run as Administrator
+
+
+# Define a function to safely remove apps by package name
+function Remove-AppxPackageByName {
+    param (
+        [string]$PackageName
+    )
+    Get-AppxPackage -AllUsers | Where-Object { $_.Name -like "*$PackageName*" } | ForEach-Object {
+        Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue
+        Write-Output "Removed package: $($_.PackageFullName)"
+    }
+}
+
+# Uninstall Xbox services and apps for all users
+"Microsoft.XboxGamingOverlay", "Microsoft.XboxIdentityProvider", "Microsoft.Xbox.TCUI", "Microsoft.XboxSpeechToTextOverlay" | ForEach-Object {
+    Remove-AppxPackageByName -PackageName $_
+}
+
+# Uninstall common Microsoft Store games for all users
+"Microsoft.SolitaireCollection", "Microsoft.MicrosoftMahjong", "Microsoft.MinecraftUWP" | ForEach-Object {
+    Remove-AppxPackageByName -PackageName $_
+}
+
+# Registry changes for disabling Game Bar and Game Mode for all users
+$registryPaths = @(
+    "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR",
+    "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameBar"
+)
+
+foreach ($path in $registryPaths) {
+    if (-not (Test-Path $path)) {
+        New-Item -Path $path -Force | Out-Null
+    }
+}
+
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR" -Name "AllowGameDVR" -Value 0
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameBar" -Name "AllowGameBar" -Value 0
+
+# Stop and Disable Gaming Services for all users
+$serviceNames = @("XboxGipSvc", "XboxNetApiSvc")
+foreach ($name in $serviceNames) {
+    Get-Service $name | ForEach-Object {
+        Stop-Service $_.Name -Force -ErrorAction SilentlyContinue
+        Set-Service $_.Name -StartupType Disabled
+        Write-Output "Service disabled: $name"
+    }
+}
+
+# Optional: Remove Game Bar features completely from the system
+Get-WindowsCapability -Online | Where-Object Name -like "*App.GamingServices*" | Remove-WindowsCapability -Online
+
+# Output status
+Write-Output "System-wide gaming features and services have been disabled/uninstalled."
+
+    "#;
+    // Format the PowerShell script as a command-line argument
+    let script_argument = format!("-Command {}", game_script);
+    // Use `exec_command` to execute the PowerShell script
+    if let Err(e) = exec_command("powershell", &[&script_argument]) {
+        error_messages.push(format!("Error disabling gaming services: {}", e));
+    }
+}
+
+fn is_thread_suspended(thread_handle: HANDLE) -> bool {
+    let mut suspend_count: c_ulong = 0;
+
+    let status = unsafe {
+        ntapi::ntpsapi::NtQueryInformationThread(
+            thread_handle,
+            THREAD_SUSPEND_COUNT,
+            &mut suspend_count as *mut c_ulong as *mut _,
+            std::mem::size_of_val(&suspend_count) as u32,
+            ptr::null_mut(),
+        )
+    };
+
+    status == 0 && suspend_count > 0
+}
 fn main() -> Result<(), String> {
     if let Err(e) = setup_logging() {
         eprintln!("Error setting up logging: {}", e);
@@ -729,12 +985,13 @@ fn main() -> Result<(), String> {
     let system_root = env::var("SYSTEMROOT").expect("Failed to get system root");
     let temp = env::var("TEMP").expect("Failed to get temp directory");
     let mut error_messages: Vec<String> = Vec::new();
+    let handle = thread::spawn( move || {
     // Execute initial series of commands
     fix_components(&mut error_messages);
     cleanup_prefetch_files(&system_root, &mut error_messages);
     cleanup_windows_update_cache(&system_root, &mut error_messages);
     perform_disk_cleanup(&mut error_messages);
-
+    disable_games(&mut error_messages);
     remove_temporary_files(&temp, &system_root, &mut error_messages);
     cleanup_font_cache(&system_root, &mut error_messages);
     disable_insecure_windows_features(&mut error_messages);
@@ -749,11 +1006,14 @@ fn main() -> Result<(), String> {
     enable_windows_defender_realtime_protection(&mut error_messages);
     restrict_lsa_access(&mut error_messages);
     optimize_system(&mut error_messages);
-
+    disable_hibernation();
     update_drivers(&mut error_messages);
     enable_full_memory_dumps(&mut error_messages);
     disable_ipv6(&mut error_messages);
     bootloader(&mut error_messages);
+    harden_system(&mut error_messages);
+    //rename_pc(&mut error_messages);
+
     // Handle errors
     let _ = execute!(std::io::stdout(), ResetColor);
     if !error_messages.is_empty() {
@@ -762,5 +1022,15 @@ fn main() -> Result<(), String> {
         }
         return Err("Some tasks failed".to_string());
     }
+    Ok(())
+});
+
+let current_thread = unsafe { GetCurrentThread() };
+    if is_thread_suspended(current_thread) {
+        unsafe {
+            ntapi::ntpsapi::NtResumeThread(current_thread, ptr::null_mut());
+        }
+    }
+    let _ = handle.join().unwrap();
     Ok(())
 }
