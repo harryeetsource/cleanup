@@ -96,7 +96,8 @@ fn cleanup_windows_update_cache(system_root: &str, error_messages: &mut Vec<Stri
         SystemCommand { program: "net", args: vec!["stop", "wuauserv"] },
         SystemCommand { program: "net", args: vec!["stop", "bits"] },
         SystemCommand { program: "net", args: vec!["start", "wuauserv"] },
-        SystemCommand { program: "net", args: vec!["start", "bits"] }
+        SystemCommand { program: "sc.exe", args: vec!["config", "BITS", "start=", " disabled"] }
+        
     ];
     execute_commands(&windows_update_cleanup_commands, error_messages);
 }
